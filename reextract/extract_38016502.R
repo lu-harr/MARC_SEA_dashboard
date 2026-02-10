@@ -30,5 +30,8 @@ dat %>%
          Authors = "Gauthier Mesia Kahunu. Sarah Wellmann Thomsen. Louise Wellmann Thomsen. Hypolite Muhindo Mavoko. Patrick Mitashi Mulopo. Emma Filtenborg Hocke. Papy Mandoko Nkoli. Vito Baraka. Daniel T.R. Minja. Andria Mousa. Cally Roper. Destin Mbongi Moke. Dieudonné Mumba Ngoyi. Eric Mukomena Sompwe. Jean Jacques Muyembe Tanfum. Helle Hansson and Michael Alifrangis",
          PubMedID = 38016502,
          Start.Year = year,
-         End.Year = year) %>%
+         End.Year = year,
+         Year.Published = 2024,
+         Continent = "Africa",
+         Country = "DRC") %>%
   write.csv("reextract/38016502_clean.csv", row.names = FALSE)

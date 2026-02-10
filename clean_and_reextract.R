@@ -80,11 +80,11 @@ marcse <- read_xlsx("Dashboard_k13_update_January_2026.xlsx") %>%
 # Problem: some Titles have multiple sets of Authors
 # (It transpires below that this is because some studies are entered twice)
 # (which is only a problem when Presents/Testeds don't match between duplicates)
+message("These Titles are entered with multiple sets of Authors:")
 marcse %>%
   group_by(Title) %>%
   summarise(n = n_distinct(Authors)) %>%
-  filter(n > 1) %>%
-  as.data.frame()
+  filter(n > 1)
 
 # These are fine:
 # "A Worldwide Map of Plasmodium falciparum K13-Propeller Polymorphisms." 
@@ -99,23 +99,50 @@ marcse %>%
 # ~ no dups, PMIDs fine
 # "Detection of Artemisinin Resistance Marker Kelch-13 469Y in Plasmodium falciparum. South Kivu. Democratic Republic of the Congo. 2022"
 # ~ no dups, PMIDs fine
-message("check extraction of this one:")
+message("Todo: check extraction of 'High frequency of artemisinin partial resistance mutations in the great lake region revealed through rapid pooled deep sequencing'")
 # "High frequency of artemisinin partial resistance mutations in the great lake region revealed through rapid pooled deep sequencing"
-# concerned that Testeds are all 100 ....
-
+# ~ concerned that Testeds are all 100 ....
+# "MIM Conference. Kawela M et al Preliminary Regional Results from GenE8"
+# ~ informal
+# "Screening for K13-propeller mutations associated with artemisinin resistance in Plasmodium falciparum in Yambio County (Western Equatoria State. South Sudan)."
+# ~ no dups, PMIDs fine
+# "The E8-led Regional Malaria Molecular Surveillance Initiative: Successes. Challenges. and Opportunities"
+# ~ informal
 
 
 # looks as though columns are in the wrong places for these entries:
-message("Todo: shift/ remove implausible prevalence here")
-marcse %>%
-  filter(Title == "2025") %>% as.data.frame()
+mwaiswelo_reformat <- marcse %>%
+  filter(Authors == "Mwaiswelo. Richard O" | Notes == "Mwaiswelo. Richard O") %>%
+  mutate(across(everything(), ~as.character(.x)))
+
+# these rows need a shift across ...
+mwaiswelo_reformat[4, 11:17] = mwaiswelo_reformat[4, 12:18]
+mwaiswelo_reformat[1, 12:13] = mwaiswelo_reformat[1, 11:12]
+mwaiswelo_reformat[1, 11] = "2" # == 1.94 * 103 / 100
+mwaiswelo_reformat <- mwaiswelo_reformat %>%
+  mutate(across(c(Longitude, Latitude, Start.Year, End.Year, year, Present, 
+                  Tested),
+                ~as.numeric(.x)),
+         Prevalence = Present / Tested * 100) 
+
+# some column shifting happening here too:
+onchieku_et_al_reformat <- marcse %>%
+  filter(Notes == "Onchieku NM. Gesusu N. Caspar E. Karani L. Thiong'o K. Kamau L. Kiboi D. Thiebaut L. Ma L. Kimani F. Matoke-Muhia D. MÃ©nard D" 
+           # details for Raman et al got populated into one row?
+         | (Title == "Very low prevalence of validated kelch13 mutations and absence of hrp2/3 double gene deletions in South African malaria-eliminating districts (2022-2024)."
+            & Country == "Kenya")) %>%
+  mutate(Title = "Prevalence of Plasmodium falciparum parasites harbouring chloroquine-resistant but not artemisinin-resistant alleles in Busia County. Western Kenya.",
+         Authors = "Onchieku NM. Gesusu N. Caspar E. Karani L. Thiong'o K. Kamau L. Kiboi D. Thiebaut L. Ma L. Kimani F. Matoke-Muhia D. MÃ©nard D",
+         Year.Published = "2025",
+         PubMedID = "40739505")
 
 conrad_et_al_deduplicated <- marcse %>%
   filter(Title == "Evolution of artemisinin partial resistance in Ugandan malaria parasites") %>%
   group_by(Longitude, Site.Name, Latitude, Marker, year, Title, PubMedID) %>%
   summarise(Present = first(Present),
             Tested = first(Tested)) %>%
-  mutate(Authors = "Melissa D. Conrad. Victor Asua. Shreeya Garg. David Giesbrecht. Karamoko Niaré. Sawyer Smith. Jane F. Namuganga. M.H.S.. et al.. and Philip J. Rosenthal")
+  mutate(Authors = "Melissa D. Conrad. Victor Asua. Shreeya Garg. David Giesbrecht. Karamoko Niaré. Sawyer Smith. Jane F. Namuganga. M.H.S.. et al.. and Philip J. Rosenthal") %>%
+  ungroup()
 
 
 # (we do the join with the Surveyor on PMID, but I've had to assign PMIDs based on titles below)
@@ -149,14 +176,55 @@ marcse %>%
   filter(Title == "Identification of the PfK13 mutations R561H and P441L in the Democratic Republic of Congo") %>%
   group_by(Site.Name, Marker, year, Longitude, Latitude) %>%
   summarise(n = n())
+# ^ have reextracted and will add in at the bottom of all of this
 
+marcse %>%
+  filter(Title == "Indigenous emergence and spread of kelch13 C469Y artemisinin-resistant Plasmodium falciparum in Uganda.")
+# there is one extra row in here: Kwania, WT, Present == 53, Tested == 56
+# and Kwania, A578S Tested should be 33
+# and Kwania WT Present should be 30
+# (From Supp Table 1)
+
+# Unclear whether these studies are included anywhere:
+# "Effectiveness of sulfadoxine-pyrimethamine plus amodiaquine and dihydroartemisinin-piperaquine for seasonal malaria chemoprevention in Uganda: a three-arm, open-label, non-inferiority and superiority, cluster-randomised, controlled trial"
+# "Day 3 parasitemia and Plasmodium falciparum Kelch 13 mutations among uncomplicated malaria patients treated with artemether-lumefantrine in Adjumani district, Uganda"
+# (Author lists are attached to a different study, Olupot-Olupot et al)
+
+filter(marcse, Notes == "Mwaiswelo. Richard O") # 1
+filter(marcse, Notes == "") # 790
+filter(marcse, Notes != "Mwaiswelo. Richard O" ) # 1155
+filter(marcse, Notes != "Mwaiswelo. Richard O" & Authors != "Mwaiswelo. Richard O") # 1020
+filter(marcse, Authors == "Mwaiswelo. Richard O") # 3
+# when u can't do sums any more it's time to give up for the day :/
 
 marcse <- marcse %>%
+  mutate(Notes = ifelse(is.na(Notes), "", Notes)) %>%
   # some of the titles and authors and PMIDs are muddled up
   mutate(Title = case_when(TRUE ~ Title)) %>%
   # need to remove duplicate entries for Kamya et al.:
   filter(!(Title == "Efficacies of artemether-lumefantrine. artesunate-amodiaquine. dihydroartemisinin-piperaquine. and artesunate-pyronaridine for the treatment of uncomplicated Plasmodium falciparum malaria in children aged 6 months to 10 years in Uganda: a randomised. open-label. phase 4 clinical trial."
-           & !is.na(Authors)))%>%
+           & !is.na(Authors))) %>%
+  # remove this duplicate entry Awor et al.:
+  filter(!(Title == "Indigenous emergence and spread of kelch13 C469Y artemisinin-resistant Plasmodium falciparum in Uganda."
+           & Site.Name == "Kwania" & Present == 53)) %>%
+  # manipulate these entries from Awor et al.:
+  mutate(Tested = ifelse(Title == "Indigenous emergence and spread of kelch13 C469Y artemisinin-resistant Plasmodium falciparum in Uganda."
+                          & Site.Name == "Kwania" & Marker == "A578S", 33, Tested),
+         Present = ifelse(Title == "Indigenous emergence and spread of kelch13 C469Y artemisinin-resistant Plasmodium falciparum in Uganda."
+                          & Site.Name == "Kwania" & Marker == "wildtype", 30, Present)) %>%
+  # and manipulate this entry from van Loon et al.:
+  mutate(Tested = ifelse(Title == "Plasmodium falciparum Kelch-13 artemisinin partial resistance markers in Fort Portal. Western Uganda. 2024"
+                         & Site.Name == "Karugutu", 44, Tested)) %>%
+  # and remove and replace Mwaiswelo
+  # LH stopped here: this should /only/ remove the mwaiswelo rows so that I can add them back
+  filter(!(Authors == "Mwaiswelo. Richard O" | Notes == "Mwaiswelo. Richard O") | is.na(Notes)) %>%
+  bind_rows(mwaiswelo_reformat) %>%
+  # and remove and replcace Onchieku et al
+  filter(!(Notes == "Onchieku NM. Gesusu N. Caspar E. Karani L. Thiong'o K. Kamau L. Kiboi D. Thiebaut L. Ma L. Kimani F. Matoke-Muhia D. MÃ©nard D" 
+         # details for Raman et al got populated into one row?
+         | (Title == "Very low prevalence of validated kelch13 mutations and absence of hrp2/3 double gene deletions in South African malaria-eliminating districts (2022-2024)."
+            & Country == "Kenya"))) %>%
+  bind_rows(onchieku_et_al_reformat) %>%
   mutate(Authors = case_when(Title == "Pharmacometric evaluation of amodiaquine-sulfadoxine-pyrimethamine and dihydroartemisinin-piperaquine seasonal malaria chemoprevention in northern Uganda"
                              ~ "Craig Bonnington , Anthony Nuwa , Katherine Theiss-Nyland , Richard Kajubi , Moses R Kamya , Joaniter Nankabirwa , Christopher Ebong , Jane Nabakooza , Jimmy Opigo , David Salandindi , Musa Odongo , Chayanin Sararat , James A Watson , Kanokon Suwannasin , Stephane Proux , Urairat Koesukwiwat , Joel Tarning , Mallika Imwong , James Tibenderana , Francois H Nosten , Nicholas J White",
                              Title == "Comprehensive analysis of molecular markers linked to antimalarial drug resistance in Plasmodium falciparum in Northern. Northeastern and Eastern Uganda"
@@ -165,23 +233,9 @@ marcse <- marcse %>%
                              ~ "Kamya MR. Nankabirwa JI. Ebong C. Asua V. Kiggundu M. Orena S. Okitwi M. Tukwasibwe S. Agaba B. Kyabayinze D. Opigo J. Rutazana D. Binagwa B. Mugwanya E. Babirye S. Sebikaari G. Condo PM. Appiah G. Nsobya SL. Conrad MD. Rosenthal PJ. Moriarty LF. Yeka A",
                              Title == "Plasmodium falciparum Kelch-13 artemisinin partial resistance markers in Fort Portal. Western Uganda. 2024"
                              ~ "Welmoed van Loon. Emma Schallenberg. Emmanuel Mande. Patrick Musinguzi. Paul Ngobi. Sharon Atukunda. John Rubaihayo. Frank P. Mockenhaupt",
-                             TRUE ~ Authors)) 
-  
-         
-         
-  
-  
-  
-  # not sure what happened here, but these titles aren't right ... (PMIDs for these also populated below)
-  mutate(Title = case_when(Title == "Comprehensive analysis of molecular markers linked to antimalarial drug resistance in Plasmodium falciparum in Northern. Northeastern and Eastern Uganda" & 
-                             Authors == "Anthony Nuwa. Kevin Baker. Richard Kajubi. Chukwudi A Nnaji. Katherine Theiss-Nyland. Musa Odongo. Tonny Kyagulanyi. Jane Nabakooza. David Salandini. Victor Asua. Maureen Nakirunda. Christian Rassi. Damian Rutazaana. Richard Achuma. Patrick Sagaki. John Baptist Bwanika. Godfrey Magumba. Adoke Yeka. Sam Nsobya. Moses R Kamya. James Tibenderana. Jimmy Opigo"
-                           ~ "Effectiveness of sulfadoxine-pyrimethamine plus amodiaquine and dihydroartemisinin-piperaquine for seasonal malaria chemoprevention in Uganda: a three-arm, open-label, non-inferiority and superiority, cluster-randomised, controlled trial",
-                           Title == "Comprehensive analysis of molecular markers linked to antimalarial drug resistance in Plasmodium falciparum in Northern. Northeastern and Eastern Uganda" &
-                             Authors == "Angwe MK. Mwebaza N. Nsobya SL. Vudriko P. Dralabu S. Omali D. Tumwebaze MA. Ocan M."
-                           ~ "Day 3 parasitemia and Plasmodium falciparum Kelch 13 mutations among uncomplicated malaria patients treated with artemether-lumefantrine in Adjumani district, Uganda",
-                           
-                           TRUE ~ Title)) %>%
-  
+                             Title == "Indigenous emergence and spread of kelch13 C469Y artemisinin-resistant Plasmodium falciparum in Uganda."
+                             ~ "Phyllis Awor*, Romain Coppée*, Nimol Khim*, Laurine Rondepierre*, Camille Roesch, Chanra Khean, Chanvong Kul, Rotha Eam, Thornleaksmey Lorn, Proscovia Athieno, Joseph Kimera, Betty Balikagala, Emmanuel I. Odongo-Aginya, Denis A. Anywar, Toshihiro Mita, Jérôme Clain, Pascal Ringwald, Aita Signorell, Christian Lengeler, Christian Burri, Frederic Ariey**, Manuel W. Hetzel**, Benoit Witkowski**",
+                             TRUE ~ Authors)) %>%
   # something has corrupted PubMedID field ........... or these are otherwise blank:
   mutate(PubMedID = case_when(
     Title == "A Novel Plasmodium falciparum Kelch13 A675T Mutation and High Levels of Chloroquine and Sulfadoxine-Pyrimethamine Resistance in Burundi" ~ "40666336",
@@ -283,24 +337,27 @@ marcse %>%
   summarise(n=n()) %>%
   as.data.frame()
 
-# I've re-extracted studies 40744006 + 39802768
+# I've re-extracted studies 40744006 + 39802768 + 38016502
 reextractees <- bind_rows(
   read.csv("reextract/40744006_clean.csv"),
-  read.csv("reextract/39802768_clean.csv")) %>%
+  read.csv("reextract/39802768_clean.csv"),
+  read.csv("reextract/38016502_clean.csv")) %>%
   mutate(Marker = ifelse(Marker == "WT", "wildtype", Marker),
          year = round((Start.Year + End.Year) / 2, 0),
          across(c(PubMedID, Year.Published), ~ as.character(.x))) %>%
   dplyr::select(-c(Province)) 
 
 marcse <- marcse %>%
-  filter(PubMedID != "40744006" & PubMedID != "39802768") %>%
+  filter(!PubMedID %in% c("40744006", "39802768", "38016502", "37611122")) %>%
   bind_rows(reextractees) %>%
+  bind_rows(conrad_et_al_deduplicated) %>%
   left_join(marker_reference, by = join_by(Marker == marker))
 
 message("check for sensibility: Testeds < Presents")
 marcse %>%
   filter(Present > Tested) %>%
-  dplyr::select(Present, Tested, Title, Authors, PubMedID, Marker)
+  dplyr::select(Present, Tested, Title, Authors, PubMedID, Marker) %>% 
+  as.data.frame()
   # group_by(Title, Authors, PubMedID) %>%
   # summarise(n = n()) %>%
   # as.data.frame()
@@ -322,6 +379,6 @@ all_studies <- marcse %>%
 # then squeeze out duplicates:
 Longitude, Latitude, Start.Year, End.Year, year, Year.Published, Marker, Title, Authors, 
 
-
+# final double check that van loon et al is only in there once
 
 
