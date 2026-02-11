@@ -379,7 +379,8 @@ filter(all_studies, Authors == "") %>%
 marcse <- marcse %>%
   group_by(Continent, Country, Site.Name, Longitude, Latitude, 
            Start.Year, End.Year, year, Year.Published, 
-           Marker, Marker_Classification, PubMedID, Title) %>%
+           Marker, Marker_Classification, PubMedID, Title,
+           Present, Tested) %>%
   summarise() %>%
   left_join(all_studies, join_by(PubMedID, Title))
 
