@@ -123,7 +123,8 @@ mwaiswelo_reformat <- mwaiswelo_reformat %>%
   mutate(across(c(Longitude, Latitude, Start.Year, End.Year, year, Present, 
                   Tested),
                 ~as.numeric(.x)),
-         Prevalence = Present / Tested * 100) 
+         Prevalence = Present / Tested * 100,
+         Notes = "") 
 
 # some column shifting happening here too:
 onchieku_et_al_reformat <- marcse %>%
@@ -190,20 +191,13 @@ marcse %>%
 # "Day 3 parasitemia and Plasmodium falciparum Kelch 13 mutations among uncomplicated malaria patients treated with artemether-lumefantrine in Adjumani district, Uganda"
 # (Author lists are attached to a different study, Olupot-Olupot et al)
 
-filter(marcse, Notes == "Mwaiswelo. Richard O") # 1
-filter(marcse, Notes == "") # 790
-filter(marcse, Notes != "Mwaiswelo. Richard O" ) # 1155
-filter(marcse, Notes != "Mwaiswelo. Richard O" & Authors != "Mwaiswelo. Richard O") # 1020
-filter(marcse, Authors == "Mwaiswelo. Richard O") # 3
-# when u can't do sums any more it's time to give up for the day :/
-
 marcse <- marcse %>%
-  mutate(Notes = ifelse(is.na(Notes), "", Notes)) %>%
-  # some of the titles and authors and PMIDs are muddled up
-  mutate(Title = case_when(TRUE ~ Title)) %>%
+  # need to do this or I can't filter on these fields negatively
+  mutate(Notes = ifelse(is.na(Notes), "", Notes),
+         Authors = ifelse(is.na(Authors), "", Authors)) %>%
   # need to remove duplicate entries for Kamya et al.:
   filter(!(Title == "Efficacies of artemether-lumefantrine. artesunate-amodiaquine. dihydroartemisinin-piperaquine. and artesunate-pyronaridine for the treatment of uncomplicated Plasmodium falciparum malaria in children aged 6 months to 10 years in Uganda: a randomised. open-label. phase 4 clinical trial."
-           & !is.na(Authors))) %>%
+           & Authors == "")) %>%
   # remove this duplicate entry Awor et al.:
   filter(!(Title == "Indigenous emergence and spread of kelch13 C469Y artemisinin-resistant Plasmodium falciparum in Uganda."
            & Site.Name == "Kwania" & Present == 53)) %>%
@@ -216,8 +210,7 @@ marcse <- marcse %>%
   mutate(Tested = ifelse(Title == "Plasmodium falciparum Kelch-13 artemisinin partial resistance markers in Fort Portal. Western Uganda. 2024"
                          & Site.Name == "Karugutu", 44, Tested)) %>%
   # and remove and replace Mwaiswelo
-  # LH stopped here: this should /only/ remove the mwaiswelo rows so that I can add them back
-  filter(!(Authors == "Mwaiswelo. Richard O" | Notes == "Mwaiswelo. Richard O") | is.na(Notes)) %>%
+  filter(!(Authors == "Mwaiswelo. Richard O" | Notes == "Mwaiswelo. Richard O")) %>%
   bind_rows(mwaiswelo_reformat) %>%
   # and remove and replcace Onchieku et al
   filter(!(Notes == "Onchieku NM. Gesusu N. Caspar E. Karani L. Thiong'o K. Kamau L. Kiboi D. Thiebaut L. Ma L. Kimani F. Matoke-Muhia D. MÃ©nard D" 
@@ -362,23 +355,39 @@ marcse %>%
   # summarise(n = n()) %>%
   # as.data.frame()
 
-# will have to remove the weird record from MTM,
-tmp <- marcse %>%
-  filter(!(Tested == 106 & Title == "WHO Threats Map" & Marker == "wildtype")) %>%
-  filter()
+# will have to remove the weird record from MTM .. too much to work out what it should be
+marcse <- marcse %>%
+  filter(!(Tested == 106 & Title == "WHO Threats Map" & Marker == "wildtype"))
 
-# concerned about 39800719
-marcse %>% filter(PubMedID == "40265952") %>% as.data.frame()
-
+# grouping down here to finish off:
+# group on study first and narrow down to one Authors for each study
 all_studies <- marcse %>%
-  group_by(Title, Authors, PubMedID) %>%
-  summarise(Authors = first(Authors))
+  group_by(Title, PubMedID) %>%
+  arrange(Authors) %>%
+  summarise(Authors = last(Authors))
 
-# grouping down here:
-# group on study first and give first() Author
-# then squeeze out duplicates:
-Longitude, Latitude, Start.Year, End.Year, year, Year.Published, Marker, Title, Authors, 
+# coolio:
+all_studies %>% group_by(Title) %>% summarise(n  = n()) %>% filter(n > 1)
+# there's lots of studies with no authors assigned but as I'm not using this field for grouping
+# it's not a huge deal from LH's pov:
+filter(all_studies, Authors == "") %>%
+  as.data.frame()
+
+# then squeeze out duplicates: 37 rows repeated (most are flagged in preamble)
+# (I'm a little disturbed that when I leave out Continent, Country, Site.Name that number goes up to 55
+# but cutting losses at this point ...)
+marcse <- marcse %>%
+  group_by(Continent, Country, Site.Name, Longitude, Latitude, 
+           Start.Year, End.Year, year, Year.Published, 
+           Marker, Marker_Classification, PubMedID, Title) %>%
+  summarise() %>%
+  left_join(all_studies, join_by(PubMedID, Title))
 
 # final double check that van loon et al is only in there once
+# filter(marcse, PubMedID == "39501325")
+# yep that looks good to me
+
+
+
 
 
