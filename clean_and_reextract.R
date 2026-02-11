@@ -387,7 +387,7 @@ marcse <- marcse %>%
 # filter(marcse, PubMedID == "39501325")
 # yep that looks good to me
 
-
+write.csv(marcse, "tidied_k13_dashboard_data.csv", row.names = FALSE)
 
 
 
