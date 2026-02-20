@@ -60,7 +60,16 @@ survey_data <- read_xlsx("40744006_extracted.xlsx", sheet = "Table S4 pivot") %>
          Authors = "Andrés Aranda-Díaz. Sydney Mwanza. Takalani I Makhanthisa. Sonja B Lauterbach. Faith De Amaral. Mukosha Chisenga. Brighton Mangena. Isobel Routledge. Blaženka Letinić. Bertha Kasonde. Gershom Chongwe. Mulenga C Mwenda. John M Miller. Tricia Hibwato. Chirwa Jacob. Busiku Hamainza. Stephen Bwalya. Japhet Chiwaula. Japhet Matoba. Chadwick Sikaala. John Chimumbwa. Amy Wesolowski. Jennifer L Smith. Jaishree Raman. Moonga Hawela",
          Year.Published = 2025,
          Continent = "Africa") %>%
-  filter(Present > 0) # don't need these: have worked out WTs and have Presences of mutants
+  filter(Present > 0) %>% # don't need these: have worked out WTs and have Presences of mutants
+  # don't need these: wrapped into WTs:
+  filter(!Marker %in% c("P441", "R529", "P574", "A578", "R622", "P667")) %>%
+  # reformat these to fit marcse dashboard/moldm format:
+  mutate(Marker = case_when(Marker == "667A" ~ "P667A",
+                            Marker == "441L" ~ "P441L",
+                            Marker == "574L" ~ "P574L",
+                            Marker == "622T" ~ "R622T",
+                            Marker == "667S" ~ "P667S",
+                            TRUE ~ Marker))
 
 joined <- left_join(survey_data, already_located, by = join_by(District == District)) %>%
   rename(Site.Name = District)

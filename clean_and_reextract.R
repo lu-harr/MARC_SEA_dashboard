@@ -77,6 +77,8 @@ marcse <- read_xlsx("Dashboard_k13_update_January_2026.xlsx") %>%
                           Tested * Prevalence,
                           Present))
 
+write.csv(marcse, "pre_tidy.csv", row.names = FALSE)
+
 # Problem: some Titles have multiple sets of Authors
 # (It transpires below that this is because some studies are entered twice)
 # (which is only a problem when Presents/Testeds don't match between duplicates)
